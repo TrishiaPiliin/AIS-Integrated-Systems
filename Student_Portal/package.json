@@ -1,0 +1,16 @@
+{
+  "name": "student_portal",
+  "version": "1.0.0",
+  "description": "AIS Student Portal",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}
