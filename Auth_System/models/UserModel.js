@@ -3,86 +3,104 @@ import validator from 'validator';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
+const ADAPTER_URL = process.env.ADAPTER_URL || 'http://localhost:4000';
+
 export const createUser = async (userProfile, email, password) => {
-  if (!email || email.trim() === '') {
-    throw new Error('Email is required');
-  }
-  if (!validator.isEmail(email)) {
-    throw new Error('Invalid email format');
-  }
+    if (!email || !password) {
+        const error = new Error('Email and Password are required.');
+        error.statusCode = 400;
+        throw error;
+    }
 
-  const [existing] = await pool.query(
-    'SELECT * FROM usertbl WHERE email = ?',
-    [email]
-  );
-  if (existing.length > 0) {
-    throw new Error('Account already exists');
-  }
+    if (!validator.isEmail(email)) {
+        const error = new Error('Invalid email address.');
+        error.statusCode = 400;
+        throw error;
+    }
 
-  if (!password || password.trim() === '') {
-    throw new Error('Password is required');
-  }
-  if (!validator.isStrongPassword(password)) {
-    throw new Error('Password is too weak')
-  }
+    if (password.length < 6) {
+        const error = new Error('Password must be at least 6 characters.');
+        error.statusCode = 400;
+        throw error;
+    }
 
-  const salt = bcrypt.genSaltSync(10);
-  const hashedPassword = bcrypt.hashSync(password, salt);
+    const [existingUser] = await pool.query(
+        'SELECT email FROM user WHERE email = ?', [email]
+    );
 
-  const response = await fetch('http://localhost:5854/auth/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(userProfile)
-  });
+    if (existingUser.length > 0) {
+        const error = new Error(`The email ${email} is already in use.`);
+        error.statusCode = 400;
+        throw error;
+    }
 
-  if (!response.ok) {               
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.message || 'Adapter layer error: ' + response.status);
-  }
+    const response = await fetch(`${ADAPTER_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userProfile)
+    });
 
-  const [newUser] = await pool.query(
-    'INSERT INTO usertbl (email, password) VALUES (?, ?)',
-    [email, hashedPassword]
-  );
+    const result = await response.json();
 
-  return newUser.insertId;
-};
+    if (!response.ok) {
+        const error = new Error(result.error || 'Failed to register student in legacy system');
+        error.statusCode = response.status;
+        throw error;
+    }
 
-export const getUser = async (id) => {
-  if (isNaN(parseInt(id))) {
-    throw new Error('Invalid ID');
-  }
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-  const [user] = await pool.query(
-    'SELECT * FROM usertbl WHERE id = ?',
-    [id]
-  );
-  return user[0] || null;
+    const [newUser] = await pool.query(
+        'INSERT INTO user (email, password) VALUES (?, ?)',
+        [email, hashedPassword]
+    );
+
+    return { insertId: newUser.insertId, legacyStudent: result };
 };
 
 export const login = async (email, password) => {
-  if (!email || !password) {
-    throw new Error('Email and password are required');
-  }
+    if (!email || !password) {
+        const error = new Error('Email and password are required.');
+        error.statusCode = 400;
+        throw error;
+    }
 
-  const [user] = await pool.query(
-    'SELECT * FROM usertbl WHERE email = ?',
-    [email]
-  );
+    const [user] = await pool.query(
+        'SELECT * FROM user WHERE email = ?', [email]
+    );
 
-  if (user.length === 0) {
-    throw new Error(`No account found for ${email}`);
-  }
+    if (user.length === 0) {
+        const error = new Error(`An account with the email ${email} does not exist.`);
+        error.statusCode = 400;
+        throw error;
+    }
 
-  if (!bcrypt.compareSync(password, user[0].password)) {
-    throw new Error('Incorrect password');
-  }
+    const validPassword = await bcrypt.compare(password, user[0].password);
 
-  const token = jwt.sign(
-    { id: user[0].id },
-    process.env.SECRET,
-    { expiresIn: '1d' }
-  );
+    if (!validPassword) {
+        const error = new Error('Incorrect password.');
+        error.statusCode = 401;
+        throw error;
+    }
 
-  return token;
+    const token = jwt.sign(
+        { id: user[0].id },
+        process.env.SECRET,
+        { expiresIn: '1d' }
+    );
+
+    return token;
+};
+
+export const getUser = async (id) => {
+    if (isNaN(parseInt(id))) {
+        throw new Error('Invalid id');
+    }
+    const [user] = await pool.query('SELECT id, email FROM user WHERE id = ?', [id]);
+    return user;
+};
+
+export const getAllUsers = async () => {
+    const [users] = await pool.query('SELECT id, email FROM user');
+    return users;
 };

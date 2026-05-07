@@ -1,28 +1,30 @@
 import * as AuthService from '../services/authService.js';
 
 export const registerStudent = async (req, res) => {
-  const { firstName, lastName, dob, course, major, status } = req.body;
+    try {
+        const studentProfile = req.body;
+        const result = await AuthService.registerStudent(studentProfile);
+        return res.status(201).json(result);
+    } catch (error) {
+        return res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
 
-  if (!firstName || !lastName || !dob || !course || !major || !status) {
-    return res.status(400).json({
-      success: false,
-      message: 'All fields are required'
-    });
-  }
+export const getStudentById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await AuthService.getStudentById(id);
+        return res.status(200).json(result);
+    } catch (error) {
+        return res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
 
-  try {
-    const studentProfile = { firstName, lastName, dob, course, major, status };
-
-    const result = await AuthService.registerStudent(studentProfile);
-
-    res.status(201).json({
-      success: true,
-      message: result
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message   
-    });
-  }
+export const getAllStudents = async (req, res) => {
+    try {
+        const result = await AuthService.getAllStudents();
+        return res.status(200).json(result);
+    } catch (error) {
+        return res.status(error.statusCode || 500).json({ error: error.message });
+    }
 };

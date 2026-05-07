@@ -1,28 +1,22 @@
-import express from 'express'
-import 'dotenv/config.js'
-import userRoutes from './routes/UserRoutes.js'
-import cors from 'cors'
+import dotenv from 'dotenv';
+dotenv.config();
 
-const app = express()
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import logger from 'morgan';
+import userRoutes from './routes/UserRoutes.js';
 
-let corsOptions = {
-  origin: process.env.ORIGIN
-}
+const app = express();
 
-app.use(express.json())
-app.use(cors(corsOptions))
+app.use(logger('dev'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
-app.use((req, res, next) => {
-  console.log(req.path, req.method)
-  next()
-})
+app.get('/', (req, res) => {
+    res.json({ message: 'Auth System API is running!' });
+});
 
-app.use('/user', userRoutes)
+app.use('/user', userRoutes);
 
-try {
-  app.listen(process.env.PORT || 3000, () => {
-  console.log(`Listening on port ${process.env.PORT || 3000}...`);
-  })
-} catch (error) {
-  console.log(error)
-}
+export default app;

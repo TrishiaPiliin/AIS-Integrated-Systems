@@ -1,43 +1,62 @@
 import * as UserModel from '../models/UserModel.js';
 
 export const register = async (req, res) => {
-  const { email, password, firstName, lastName, dob, course, major, status } = req.body;
+    const { email, password, firstName, lastName, dob, course, major, status, address } = req.body;
 
-  if (!email || !password || !firstName || !lastName || !dob || !course || !major || !status) {
-    return res.status(400).json({
-      success: false,
-      message: 'All fields are required'
-    });
-  }
+    try {
+        const userProfile = { firstName, lastName, dob, course, major, status, address };
+        await UserModel.createUser(userProfile, email, password);
 
-  try {
-    const userProfile = { firstName, lastName, dob, course, major, status };
-    const user = await UserModel.createUser(userProfile, email, password);
-    res.status(201).json({ success: true, message: [{ result:  'registration successful'}] });
-  } catch (e) {
-    console.error(e);
-    res.status(400).json({ success: false, message: e.message });
-  }
+        res.status(201).json({
+            success: true,
+            message: [{ result: 'A new account has been created!' }]
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(e.statusCode || 500).json({
+            success: false,
+            message: e.message || 'Internal Server Error'
+        });
+    }
 };
 
 export const login = async (req, res) => {
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email and password are required'
-    });
-  }
+    try {
+        const token = await UserModel.login(email, password);
 
-  try {
-    const token = await UserModel.login(email, password);
+        res.cookie('jwt', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 24 * 60 * 60 * 1000
+        });
+
+        res.status(200).json({
+            success: true,
+            message: [{ result: 'Login successful!', token }]
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(e.statusCode || 500).json({
+            success: false,
+            message: e.message || 'Internal Server Error'
+        });
+    }
+};
+
+export const getMe = async (req, res) => {
     res.status(200).json({
-      success: true,
-      message: [{ result: 'Login successful' }, { token }]
+        success: true,
+        user: req.user
     });
-  } catch (e) {
-    console.error(e);
-    res.status(400).json({ success: false, message: e.message });
-  }
+};
+
+export const getAllUsers = async (req, res) => {
+    try {
+        const users = await UserModel.getAllUsers();
+        res.status(200).json({ success: true, users });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
 };

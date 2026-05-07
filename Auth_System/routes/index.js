@@ -1,9 +1,8 @@
 import express from 'express';
-
 const router = express.Router();
 
 router.get('/', (req, res) => {
-  res.json({ message: 'AIS Auth System is running!' });
+  res.json({ message: 'AIS API is running!' });
 });
 
 export default router;
